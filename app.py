@@ -1,287 +1,448 @@
-"""Streamlit dashboard for prediction market baseline analysis."""
+"""Streamlit dashboard for prediction market forecasting performance."""
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="Prediction Markets — Baseline Analysis", layout="wide")
+st.set_page_config(page_title="Prediction Markets — Agent Performance", layout="wide")
 
 # ─── Data Loading ────────────────────────────────────────────────────────────
 
 
-@st.cache_data
+@st.cache_data(ttl=60)  # reload every 60s for live updates
 def load_data():
-    """Load markets and merge with all baseline predictions."""
+    """Load markets and all predictions (agent + baselines)."""
     markets = pd.DataFrame(json.load(open("data/processed/markets.json")))
     markets["resolution_date"] = pd.to_datetime(markets["resolution_date"])
 
     pred_dir = Path("data/predictions")
-    model_preds = {}
+    all_preds = {}
     for f in sorted(pred_dir.glob("*.jsonl")):
         rows = [json.loads(line) for line in f.read_text().strip().split("\n") if line]
         if rows:
-            df = pd.DataFrame(rows)
-            model_name = df["model"].iloc[0]
-            model_preds[model_name] = df
+            all_preds[f.stem] = pd.DataFrame(rows)
 
-    return markets, model_preds
+    return markets, all_preds
 
 
-markets, model_preds = load_data()
-model_names = list(model_preds.keys())
+markets, all_preds = load_data()
 
-# Build merged dataframe: one row per market with all model predictions
-merged = markets[["id", "question", "market_probability", "category", "platform", "resolution_date", "volume", "url"]].copy()
-for name in model_names:
-    df = model_preds[name][["market_id", "probability", "confidence", "reasoning"]].copy()
-    short = name.split("/")[-1]
-    df = df.rename(columns={
-        "probability": f"pred_{short}",
-        "confidence": f"conf_{short}",
-        "reasoning": f"reason_{short}",
+# Identify agent results
+judge_df = all_preds.get("ensemble_agent")
+has_judge = judge_df is not None and len(judge_df) > 0
+
+# Identify baseline + search baseline predictions
+baseline_keys = [k for k in all_preds if k.startswith(("openai_", "anthropic_", "google_")) and "run_" not in k]
+search_keys = [k for k in all_preds if k.startswith("search_")]
+agent_keys = [k for k in all_preds if k.startswith("tool_agent_")]
+
+# Build main dataframe
+df = markets[["id", "question", "market_probability", "category", "platform",
+              "resolution_date", "volume", "url"]].copy()
+
+# Add resolved status
+if "resolved" in markets.columns:
+    df["resolved"] = markets["resolved"].fillna(False).astype(bool)
+    df["outcome"] = markets.get("outcome")
+else:
+    df["resolved"] = False
+    df["outcome"] = None
+
+if "last_refreshed" in markets.columns:
+    df["last_refreshed"] = markets["last_refreshed"]
+
+# Merge agent judge predictions
+if has_judge:
+    judge_merge = judge_df[["market_id", "probability", "confidence", "reasoning"]].copy()
+    judge_merge = judge_merge.rename(columns={
+        "probability": "agent_pred",
+        "confidence": "agent_conf",
+        "reasoning": "agent_reasoning",
     })
-    merged = merged.merge(df, left_on="id", right_on="market_id", how="left").drop(columns=["market_id"])
+    df = df.merge(judge_merge, left_on="id", right_on="market_id", how="left").drop(columns=["market_id"])
 
-pred_cols = [c for c in merged.columns if c.startswith("pred_")]
-short_names = [c.replace("pred_", "") for c in pred_cols]
+    # Add run details if available
+    if "run_probs" in judge_df.columns:
+        run_probs = judge_df.set_index("market_id")["run_probs"]
+        df["run_probs"] = df["id"].map(run_probs)
+        df["run_spread"] = df["run_probs"].apply(
+            lambda x: max(x) - min(x) if isinstance(x, list) and len(x) > 1 else 0
+        )
+
+# Merge search baselines
+for key in search_keys:
+    pred_df = all_preds[key][["market_id", "probability"]].copy()
+    short = key.replace("search_", "s_")
+    pred_df = pred_df.rename(columns={"probability": f"pred_{short}"})
+    df = df.merge(pred_df, left_on="id", right_on="market_id", how="left").drop(columns=["market_id"])
+
+# Merge raw baselines
+for key in baseline_keys:
+    pred_df = all_preds[key][["market_id", "probability"]].copy()
+    short = key.split("_")[0][:6]  # e.g. "openai", "anthro", "google"
+    pred_df = pred_df.rename(columns={"probability": f"base_{short}"})
+    df = df.merge(pred_df, left_on="id", right_on="market_id", how="left").drop(columns=["market_id"])
 
 # Derived columns
-merged["model_mean"] = merged[pred_cols].mean(axis=1)
-merged["model_std"] = merged[pred_cols].std(axis=1)
-merged["model_spread"] = merged[pred_cols].max(axis=1) - merged[pred_cols].min(axis=1)
-merged["mean_vs_market"] = merged["model_mean"] - merged["market_probability"]
+if has_judge:
+    df["agent_vs_market"] = df["agent_pred"] - df["market_probability"]
+    df["agent_abs_dev"] = df["agent_vs_market"].abs()
+
+# Brier scores for resolved markets
+resolved_df = df[df["resolved"] == True].copy()
+has_resolutions = len(resolved_df) > 0
+if has_resolutions:
+    resolved_df["outcome_binary"] = resolved_df["outcome"].map({"Yes": 1, "No": 0})
+    resolved_df = resolved_df.dropna(subset=["outcome_binary"])
+    has_resolutions = len(resolved_df) > 0
 
 # ─── Sidebar ─────────────────────────────────────────────────────────────────
 
 st.sidebar.title("Filters")
-cats = ["All"] + sorted(merged["category"].unique().tolist())
+
+cats = ["All"] + sorted(df["category"].dropna().unique().tolist())
 sel_cat = st.sidebar.selectbox("Category", cats)
 if sel_cat != "All":
-    merged = merged[merged["category"] == sel_cat]
+    df = df[df["category"] == sel_cat]
 
-platforms = ["All"] + sorted(merged["platform"].unique().tolist())
+platforms = ["All"] + sorted(df["platform"].unique().tolist())
 sel_plat = st.sidebar.selectbox("Platform", platforms)
 if sel_plat != "All":
-    merged = merged[merged["platform"] == sel_plat]
+    df = df[df["platform"] == sel_plat]
 
-min_spread = st.sidebar.slider("Min model disagreement (spread)", 0.0, 1.0, 0.0, 0.01)
-merged = merged[merged["model_spread"] >= min_spread]
+show_resolved = st.sidebar.radio("Resolution status", ["All", "Resolved", "Unresolved"])
+if show_resolved == "Resolved":
+    df = df[df["resolved"] == True]
+elif show_resolved == "Unresolved":
+    df = df[df["resolved"] != True]
 
 st.sidebar.markdown("---")
-st.sidebar.metric("Markets shown", len(merged))
+st.sidebar.metric("Markets shown", len(df))
+n_resolved = df["resolved"].sum() if "resolved" in df.columns else 0
+st.sidebar.metric("Resolved", int(n_resolved))
 
-# ─── Tab Layout ──────────────────────────────────────────────────────────────
+if "last_refreshed" in df.columns:
+    latest = df["last_refreshed"].dropna()
+    if len(latest) > 0:
+        st.sidebar.caption(f"Last refresh: {str(latest.iloc[0])[:19]}")
 
-tab_overview, tab_scatter, tab_disagree, tab_explore, tab_calibration = st.tabs(
-    ["Overview", "Model vs Market", "Disagreement", "Market Explorer", "Calibration (post-resolution)"]
-)
+# ─── Tabs ────────────────────────────────────────────────────────────────────
 
-# ─── Tab 1: Overview ─────────────────────────────────────────────────────────
+tabs = st.tabs([
+    "Performance",
+    "Agent Predictions",
+    "Scoring",
+    "Market Explorer",
+    "Baselines",
+])
 
-with tab_overview:
-    st.header("Baseline Summary")
+# ─── Tab 1: Performance Overview ─────────────────────────────────────────────
 
-    cols = st.columns(len(model_names) + 1)
-    with cols[0]:
-        st.metric("Markets", len(merged))
+with tabs[0]:
+    st.header("Agent Performance")
 
-    for i, name in enumerate(model_names):
-        short = name.split("/")[-1]
-        col_name = f"pred_{short}"
-        valid = merged[col_name].dropna()
-        failed = merged[col_name].isna().sum()
-        with cols[i + 1]:
-            st.metric(name, f"mean {valid.mean():.3f}", delta=f"{failed} failed" if failed else None, delta_color="inverse")
+    if not has_judge:
+        st.warning("No agent predictions found. Run the agent pipeline first.")
+    else:
+        # Key metrics
+        valid = df.dropna(subset=["agent_pred"])
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("Markets predicted", len(valid))
+        c2.metric("Resolved", int(n_resolved))
+        c3.metric("Mean deviation from market", f"{valid['agent_vs_market'].mean():+.3f}")
+        c4.metric("Median |deviation|", f"{valid['agent_abs_dev'].median():.3f}")
+        agrees = (valid["agent_abs_dev"] < 0.03).sum()
+        c5.metric("Within 3% of market", f"{agrees}/{len(valid)}")
 
-    st.subheader("Prediction Distributions")
-    hist_data = {}
-    for name in model_names:
-        short = name.split("/")[-1]
-        hist_data[name] = merged[f"pred_{short}"].dropna()
-    hist_data["Market Price"] = merged["market_probability"]
-    chart_df = pd.DataFrame(hist_data)
-    st.bar_chart(chart_df.melt(var_name="Source", value_name="Probability").groupby(["Source", pd.cut(chart_df.melt(var_name="Source", value_name="Probability")["Probability"], bins=20)]).size().unstack(fill_value=0), height=300)
+        if has_resolutions:
+            st.subheader("Brier Scores (resolved markets)")
+            r = resolved_df.dropna(subset=["outcome_binary"])
+            if len(r) > 0:
+                scores = {}
+                # Agent
+                agent_r = r.dropna(subset=["agent_pred"])
+                if len(agent_r) > 0:
+                    scores["Agent (Judge)"] = {
+                        "brier": ((agent_r["agent_pred"] - agent_r["outcome_binary"]) ** 2).mean(),
+                        "n": len(agent_r),
+                    }
+                # Market
+                scores["Market Price"] = {
+                    "brier": ((r["market_probability"] - r["outcome_binary"]) ** 2).mean(),
+                    "n": len(r),
+                }
+                # Search baselines
+                for key in search_keys:
+                    short = key.replace("search_", "s_")
+                    col = f"pred_{short}"
+                    if col in r.columns:
+                        br = r.dropna(subset=[col])
+                        if len(br) > 0:
+                            scores[f"Search {key.split('_', 1)[1]}"] = {
+                                "brier": ((br[col] - br["outcome_binary"]) ** 2).mean(),
+                                "n": len(br),
+                            }
 
-    # Simpler histogram approach
-    st.subheader("Distribution Comparison")
-    for name in model_names:
-        short = name.split("/")[-1]
-        vals = merged[f"pred_{short}"].dropna()
-        counts, edges = np.histogram(vals, bins=20, range=(0, 1))
-        bin_labels = [f"{edges[i]:.2f}" for i in range(len(counts))]
-        st.caption(name)
-        st.bar_chart(pd.DataFrame({"count": counts}, index=bin_labels), height=150)
+                score_df = pd.DataFrame(scores).T
+                score_df.columns = ["Brier Score", "N"]
+                score_df = score_df.sort_values("Brier Score")
+                st.dataframe(score_df, use_container_width=True)
+        else:
+            st.info("No markets resolved yet. Brier scores will appear here once markets resolve.")
 
-    mkt_counts, mkt_edges = np.histogram(merged["market_probability"], bins=20, range=(0, 1))
-    st.caption("Market Price")
-    st.bar_chart(pd.DataFrame({"count": mkt_counts}, index=[f"{mkt_edges[i]:.2f}" for i in range(len(mkt_counts))]), height=150)
+        # Distribution of agent predictions vs market
+        st.subheader("Agent vs Market Distribution")
+        chart_data = pd.DataFrame({
+            "Agent Prediction": valid["agent_pred"],
+            "Market Price": valid["market_probability"],
+        })
+        st.scatter_chart(
+            chart_data,
+            x="Market Price",
+            y="Agent Prediction",
+            height=400,
+        )
 
-    # Category breakdown
-    st.subheader("By Category")
-    cat_stats = []
-    for cat in merged["category"].unique():
-        row = {"category": cat, "count": len(merged[merged["category"] == cat])}
-        for name in model_names:
-            short = name.split("/")[-1]
-            row[f"mean_{short}"] = merged.loc[merged["category"] == cat, f"pred_{short}"].mean()
-        row["market_mean"] = merged.loc[merged["category"] == cat, "market_probability"].mean()
-        cat_stats.append(row)
-    cat_df = pd.DataFrame(cat_stats).sort_values("count", ascending=False)
-    st.dataframe(cat_df, use_container_width=True, hide_index=True)
+        # Where agent deviates most
+        st.subheader("Largest Agent Deviations from Market")
+        dev_df = valid.nlargest(20, "agent_abs_dev")[
+            ["question", "market_probability", "agent_pred", "agent_vs_market",
+             "agent_conf", "platform", "category"]
+        ].copy()
+        dev_df.columns = ["Question", "Market", "Agent", "Delta", "Confidence", "Platform", "Category"]
+        st.dataframe(
+            dev_df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Market": st.column_config.NumberColumn(format="%.3f"),
+                "Agent": st.column_config.NumberColumn(format="%.3f"),
+                "Delta": st.column_config.NumberColumn(format="%+.3f"),
+            },
+        )
 
-# ─── Tab 2: Model vs Market ──────────────────────────────────────────────────
+# ─── Tab 2: Agent Predictions Detail ─────────────────────────────────────────
 
-with tab_scatter:
-    st.header("Model Predictions vs Market Price")
-    st.caption("Points on the diagonal = model agrees with market. Systematic deviations = exploitable bias.")
+with tabs[1]:
+    st.header("Agent Predictions")
 
-    sel_model = st.selectbox("Model", model_names)
-    short = sel_model.split("/")[-1]
-    col_name = f"pred_{short}"
+    if not has_judge:
+        st.warning("No agent predictions found.")
+    else:
+        valid = df.dropna(subset=["agent_pred"])
 
-    scatter_df = merged[["market_probability", col_name, "question", "category"]].dropna()
-    scatter_df = scatter_df.rename(columns={col_name: "model_prediction"})
+        # Summary by confidence
+        conf_summary = valid.groupby("agent_conf").agg(
+            count=("agent_pred", "size"),
+            mean_abs_dev=("agent_abs_dev", "mean"),
+        ).reset_index()
+        st.dataframe(conf_summary, use_container_width=True, hide_index=True)
 
-    st.scatter_chart(
-        scatter_df,
-        x="market_probability",
-        y="model_prediction",
-        color="category",
-        height=500,
-    )
+        # Full table
+        st.subheader("All Predictions")
+        search = st.text_input("Search", "", key="agent_search")
+        show_df = valid
+        if search:
+            show_df = show_df[show_df["question"].str.contains(search, case=False, na=False)]
 
-    # Bias analysis
-    diff = scatter_df["model_prediction"] - scatter_df["market_probability"]
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Mean bias", f"{diff.mean():+.4f}")
-    c2.metric("Median bias", f"{diff.median():+.4f}")
-    c3.metric("MAE vs market", f"{diff.abs().mean():.4f}")
-    c4.metric("Correlation", f"{scatter_df['market_probability'].corr(scatter_df['model_prediction']):.4f}")
+        sort_col = st.selectbox("Sort by", ["agent_abs_dev", "agent_vs_market", "market_probability", "volume"], key="agent_sort")
+        show_df = show_df.sort_values(sort_col, ascending=False)
 
-    # Where does this model deviate most from market?
-    st.subheader(f"Largest deviations: {sel_model} vs Market")
-    scatter_df["deviation"] = diff.abs()
-    scatter_df["signed_deviation"] = diff
-    top_devs = scatter_df.nlargest(15, "deviation")[["question", "market_probability", "model_prediction", "signed_deviation", "category"]]
-    st.dataframe(top_devs, use_container_width=True, hide_index=True)
+        display = show_df[["question", "market_probability", "agent_pred", "agent_vs_market",
+                           "agent_conf", "category", "platform", "resolved"]].head(100)
+        display.columns = ["Question", "Market", "Agent", "Delta", "Confidence", "Category", "Platform", "Resolved"]
+        st.dataframe(
+            display,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Market": st.column_config.NumberColumn(format="%.3f"),
+                "Agent": st.column_config.NumberColumn(format="%.3f"),
+                "Delta": st.column_config.NumberColumn(format="%+.3f"),
+            },
+        )
 
-# ─── Tab 3: Disagreement ─────────────────────────────────────────────────────
+        # Detail view
+        st.subheader("Prediction Detail")
+        if len(show_df) > 0:
+            sel_idx = st.selectbox(
+                "Select market",
+                show_df.index,
+                format_func=lambda i: show_df.loc[i, "question"][:100],
+                key="agent_detail",
+            )
+            row = show_df.loc[sel_idx]
 
-with tab_disagree:
-    st.header("Where Models Disagree Most")
-    st.caption("High disagreement = the models have different information or reasoning. These are the best targets for an agent with web search.")
+            c1, c2 = st.columns([1, 2])
+            with c1:
+                st.metric("Market Price", f"{row['market_probability']:.1%}")
+                st.metric("Agent Prediction", f"{row['agent_pred']:.1%}",
+                          delta=f"{row['agent_vs_market']:+.1%} vs market")
+                st.metric("Confidence", row["agent_conf"])
+                if row.get("resolved"):
+                    st.metric("Outcome", row.get("outcome", "Unknown"))
+                if isinstance(row.get("run_probs"), list):
+                    st.caption("Individual agent runs:")
+                    for i, p in enumerate(row["run_probs"], 1):
+                        st.text(f"  Run {i}: {p:.3f}")
+            with c2:
+                st.caption("Judge Reasoning")
+                st.write(row.get("agent_reasoning", "No reasoning available"))
 
-    disagree_df = merged[["question", "market_probability", "model_mean", "model_std", "model_spread", "category"] + pred_cols].copy()
-    disagree_df = disagree_df.sort_values("model_spread", ascending=False)
+# ─── Tab 3: Scoring ──────────────────────────────────────────────────────────
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Mean spread", f"{merged['model_spread'].mean():.4f}")
-    c2.metric("Median spread", f"{merged['model_spread'].median():.4f}")
-    c3.metric("Markets with spread > 0.1", f"{(merged['model_spread'] > 0.1).sum()}")
+with tabs[2]:
+    st.header("Scoring & Calibration")
 
-    st.subheader("Highest Disagreement Markets")
-    display_cols = ["question", "market_probability", "model_spread", "model_mean"] + pred_cols + ["category"]
-    st.dataframe(
-        disagree_df[display_cols].head(30),
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "market_probability": st.column_config.NumberColumn(format="%.3f"),
-            "model_spread": st.column_config.NumberColumn(format="%.3f"),
-            "model_mean": st.column_config.NumberColumn(format="%.3f"),
-            **{c: st.column_config.NumberColumn(format="%.3f") for c in pred_cols},
-        },
-    )
+    if not has_resolutions:
+        st.info("Waiting for markets to resolve. This tab will populate automatically as outcomes come in.")
+        st.caption(f"Current status: {int(n_resolved)} / {len(df)} markets resolved")
+    else:
+        r = resolved_df.dropna(subset=["outcome_binary"])
 
-    st.subheader("Disagreement by Category")
-    cat_disagree = merged.groupby("category").agg(
-        count=("model_spread", "size"),
-        mean_spread=("model_spread", "mean"),
-        max_spread=("model_spread", "max"),
-    ).sort_values("mean_spread", ascending=False).reset_index()
-    st.dataframe(cat_disagree, use_container_width=True, hide_index=True)
+        st.subheader(f"Resolved: {len(r)} markets")
+
+        # Outcome distribution
+        c1, c2 = st.columns(2)
+        yes_count = (r["outcome_binary"] == 1).sum()
+        no_count = (r["outcome_binary"] == 0).sum()
+        c1.metric("Resolved Yes", int(yes_count))
+        c2.metric("Resolved No", int(no_count))
+
+        # Calibration chart for agent
+        if has_judge and "agent_pred" in r.columns:
+            agent_r = r.dropna(subset=["agent_pred"])
+            if len(agent_r) >= 5:
+                st.subheader("Agent Calibration")
+                agent_r["bin"] = pd.cut(agent_r["agent_pred"], bins=10, labels=False)
+                cal = agent_r.groupby("bin").agg(
+                    predicted=("agent_pred", "mean"),
+                    actual=("outcome_binary", "mean"),
+                    count=("outcome_binary", "size"),
+                ).reset_index()
+                st.line_chart(
+                    cal[["predicted", "actual"]].set_index(cal["predicted"]),
+                    height=300,
+                )
+
+        # Per-market results
+        st.subheader("Resolved Market Results")
+        results_display = r[["question", "market_probability", "outcome"]].copy()
+        if has_judge and "agent_pred" in r.columns:
+            results_display["agent_pred"] = r["agent_pred"]
+            results_display["agent_error"] = (r["agent_pred"] - r["outcome_binary"]).abs()
+            results_display["market_error"] = (r["market_probability"] - r["outcome_binary"]).abs()
+            results_display["agent_better"] = results_display["agent_error"] < results_display["market_error"]
+
+        st.dataframe(results_display, use_container_width=True, hide_index=True)
 
 # ─── Tab 4: Market Explorer ──────────────────────────────────────────────────
 
-with tab_explore:
+with tabs[3]:
     st.header("Market Explorer")
 
-    search = st.text_input("Search questions", "")
+    search = st.text_input("Search questions", "", key="explore_search")
+    explore_df = df
     if search:
-        mask = merged["question"].str.contains(search, case=False, na=False)
-        explore_df = merged[mask]
-    else:
-        explore_df = merged
+        explore_df = explore_df[explore_df["question"].str.contains(search, case=False, na=False)]
 
-    sort_col = st.selectbox("Sort by", ["model_spread", "volume", "market_probability", "mean_vs_market"] + pred_cols, index=0)
-    sort_dir = st.radio("Direction", ["Descending", "Ascending"], horizontal=True)
+    cols_to_show = ["question", "market_probability", "platform", "category", "resolved"]
+    if has_judge:
+        cols_to_show.insert(2, "agent_pred")
+        cols_to_show.insert(3, "agent_vs_market")
 
+    sort_options = [c for c in cols_to_show if c not in ("question", "resolved")]
+    sort_col = st.selectbox("Sort by", sort_options, key="explore_sort")
+    sort_dir = st.radio("Direction", ["Descending", "Ascending"], horizontal=True, key="explore_dir")
     explore_df = explore_df.sort_values(sort_col, ascending=(sort_dir == "Ascending"))
 
-    display = explore_df[["question", "market_probability", "model_mean", "model_spread", "mean_vs_market", "category", "platform"] + pred_cols].head(50)
     st.dataframe(
-        display,
+        explore_df[cols_to_show].head(100),
         use_container_width=True,
         hide_index=True,
         column_config={
             "market_probability": st.column_config.NumberColumn("Market", format="%.3f"),
-            "model_mean": st.column_config.NumberColumn("Model Mean", format="%.3f"),
-            "model_spread": st.column_config.NumberColumn("Spread", format="%.3f"),
-            "mean_vs_market": st.column_config.NumberColumn("Mean-Market", format="%+.3f"),
-            **{c: st.column_config.NumberColumn(format="%.3f") for c in pred_cols},
+            "agent_pred": st.column_config.NumberColumn("Agent", format="%.3f"),
+            "agent_vs_market": st.column_config.NumberColumn("Delta", format="%+.3f"),
         },
     )
 
-    # Detail view
-    st.subheader("Market Detail")
+    # Detail with link
     if len(explore_df) > 0:
-        sel_idx = st.selectbox("Select market", explore_df.index, format_func=lambda i: explore_df.loc[i, "question"][:100])
+        sel_idx = st.selectbox(
+            "Select market for detail",
+            explore_df.index,
+            format_func=lambda i: explore_df.loc[i, "question"][:100],
+            key="explore_detail",
+        )
         row = explore_df.loc[sel_idx]
+        if pd.notna(row.get("url")):
+            st.markdown(f"[Open on {row['platform']}]({row['url']})")
 
-        c1, c2 = st.columns(2)
-        with c1:
-            st.metric("Market Price", f"{row['market_probability']:.1%}")
-            for name in model_names:
-                short = name.split("/")[-1]
-                val = row[f"pred_{short}"]
-                diff = val - row["market_probability"]
-                st.metric(name, f"{val:.1%}", delta=f"{diff:+.1%} vs market")
-        with c2:
-            for name in model_names:
-                short = name.split("/")[-1]
-                reason_col = f"reason_{short}"
-                if reason_col in row and pd.notna(row.get(reason_col)):
-                    st.caption(name)
-                    st.write(row[reason_col])
+# ─── Tab 5: Baselines ────────────────────────────────────────────────────────
 
-# ─── Tab 5: Calibration ──────────────────────────────────────────────────────
+with tabs[4]:
+    st.header("Baseline Comparison")
 
-with tab_calibration:
-    st.header("Calibration Analysis")
-    st.info("This tab will populate once markets resolve and resolution data is available. Upload a resolution file or check back after March 8-9.")
+    search_pred_cols = [c for c in df.columns if c.startswith("pred_s_")]
+    base_pred_cols = [c for c in df.columns if c.startswith("base_")]
+    all_pred_cols = search_pred_cols + base_pred_cols
 
-    st.subheader("Pre-resolution: Model vs Market Calibration")
-    st.caption("How well do models track the market price? (Not ground truth, but a proxy.)")
+    if not all_pred_cols:
+        st.info("No baseline predictions found. Run baselines first.")
+    else:
+        # Summary stats
+        st.subheader("Baseline Summary")
+        summary_rows = []
+        for col in all_pred_cols:
+            valid = df[col].dropna()
+            label = col.replace("pred_s_", "search/").replace("base_", "raw/")
+            mae = (valid - df.loc[valid.index, "market_probability"]).abs().mean()
+            summary_rows.append({
+                "Model": label,
+                "N": len(valid),
+                "Mean Pred": valid.mean(),
+                "MAE vs Market": mae,
+            })
+        if has_judge:
+            agent_valid = df["agent_pred"].dropna()
+            mae = (agent_valid - df.loc[agent_valid.index, "market_probability"]).abs().mean()
+            summary_rows.insert(0, {
+                "Model": "Agent (Judge)",
+                "N": len(agent_valid),
+                "Mean Pred": agent_valid.mean(),
+                "MAE vs Market": mae,
+            })
 
-    for name in model_names:
-        short = name.split("/")[-1]
-        col_name = f"pred_{short}"
-        valid = merged[["market_probability", col_name]].dropna()
+        st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
 
-        # Bin by market probability
-        valid["bin"] = pd.cut(valid["market_probability"], bins=10, labels=False)
-        cal = valid.groupby("bin").agg(
-            market_mean=("market_probability", "mean"),
-            model_mean=(col_name, "mean"),
-            count=("market_probability", "size"),
-        ).reset_index()
-
-        st.caption(f"{name} — binned model mean vs market mean")
-        cal_chart = cal[["market_mean", "model_mean"]].set_index(cal["market_mean"])
-        st.line_chart(cal_chart, height=250)
-
-        brier_proxy = ((valid[col_name] - valid["market_probability"]) ** 2).mean()
-        st.caption(f"MSE vs market: {brier_proxy:.6f}")
+        if has_resolutions:
+            st.subheader("Brier Scores (resolved)")
+            r = resolved_df.dropna(subset=["outcome_binary"])
+            brier_rows = []
+            for col in all_pred_cols:
+                valid = r.dropna(subset=[col])
+                if len(valid) > 0:
+                    brier = ((valid[col] - valid["outcome_binary"]) ** 2).mean()
+                    label = col.replace("pred_s_", "search/").replace("base_", "raw/")
+                    brier_rows.append({"Model": label, "Brier": brier, "N": len(valid)})
+            # Market baseline
+            brier_rows.append({
+                "Model": "Market Price",
+                "Brier": ((r["market_probability"] - r["outcome_binary"]) ** 2).mean(),
+                "N": len(r),
+            })
+            if has_judge:
+                agent_r = r.dropna(subset=["agent_pred"])
+                if len(agent_r) > 0:
+                    brier_rows.insert(0, {
+                        "Model": "Agent (Judge)",
+                        "Brier": ((agent_r["agent_pred"] - agent_r["outcome_binary"]) ** 2).mean(),
+                        "N": len(agent_r),
+                    })
+            brier_df = pd.DataFrame(brier_rows).sort_values("Brier")
+            st.dataframe(brier_df, use_container_width=True, hide_index=True)

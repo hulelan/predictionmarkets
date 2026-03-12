@@ -12,10 +12,10 @@ build/
 # Environment variables
 .env
 
-# Data files (large / regenerable)
+# Data files (large)
 data/raw/
 data/processed/*.parquet
-data/predictions/
+data/predictions/archive/
 
 # Results (regenerable)
 results/*.png
