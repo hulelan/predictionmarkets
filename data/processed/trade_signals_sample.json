@@ -1,0 +1,362 @@
+[
+  {
+    "id": "1456055",
+    "platform": "polymarket",
+    "question": "Will FC Barcelona win on 2026-03-10?",
+    "volume": 546116.9811779998,
+    "market_probability": 0.445,
+    "signals": {
+      "whale_flow": 0.0,
+      "concentration": 0.0,
+      "momentum_24h": 0.0,
+      "momentum_6h": 0.0,
+      "volume_surge": 1.0,
+      "n_trades": 0,
+      "has_data": false
+    },
+    "adjusted_probability": 0.445,
+    "adjustment_explanation": "insufficient trade data"
+  },
+  {
+    "id": "1462824",
+    "platform": "polymarket",
+    "question": "Will Elon Musk post 300-319 tweets from March 3 to March 10, 2026?",
+    "volume": 505675.18061899976,
+    "market_probability": 0.2025,
+    "signals": {
+      "whale_flow": 0.0,
+      "concentration": 0.0,
+      "momentum_24h": 0.0,
+      "momentum_6h": 0.0,
+      "volume_surge": 1.0,
+      "n_trades": 0,
+      "has_data": false
+    },
+    "adjusted_probability": 0.2025,
+    "adjustment_explanation": "insufficient trade data"
+  },
+  {
+    "id": "1462820",
+    "platform": "polymarket",
+    "question": "Will Elon Musk post 280-299 tweets from March 3 to March 10, 2026?",
+    "volume": 467945.3576510003,
+    "market_probability": 0.11,
+    "signals": {
+      "whale_flow": 0.0,
+      "concentration": 0.0,
+      "momentum_24h": 0.0,
+      "momentum_6h": 0.0,
+      "volume_surge": 1.0,
+      "n_trades": 0,
+      "has_data": false
+    },
+    "adjusted_probability": 0.11,
+    "adjustment_explanation": "insufficient trade data"
+  },
+  {
+    "id": "1462829",
+    "platform": "polymarket",
+    "question": "Will Elon Musk post 320-339 tweets from March 3 to March 10, 2026?",
+    "volume": 403604.87614999997,
+    "market_probability": 0.3355,
+    "signals": {
+      "whale_flow": 0.0,
+      "concentration": 0.0,
+      "momentum_24h": 0.0,
+      "momentum_6h": 0.0,
+      "volume_surge": 1.0,
+      "n_trades": 0,
+      "has_data": false
+    },
+    "adjusted_probability": 0.3355,
+    "adjustment_explanation": "insufficient trade data"
+  },
+  {
+    "id": "KXUCLGAME-26MAR10NEWBAR-BAR",
+    "platform": "kalshi",
+    "question": "Newcastle vs Barcelona Winner?",
+    "volume": 370580.0,
+    "market_probability": 0.445,
+    "signals": {
+      "whale_flow": 0.9758817921830315,
+      "concentration": 0.01686869151573157,
+      "momentum_24h": 0.003279771803654241,
+      "momentum_6h": 0.010286683013955744,
+      "volume_surge": 3.064253592530256,
+      "n_trades": 1000,
+      "has_data": true
+    },
+    "adjusted_probability": 0.4513252169781968,
+    "adjustment_explanation": "trade signal adjustment: whale=+0.98, momentum=+0.003, adj=+0.006"
+  },
+  {
+    "id": "1462836",
+    "platform": "polymarket",
+    "question": "Will Elon Musk post 340-359 tweets from March 3 to March 10, 2026?",
+    "volume": 335434.1381509991,
+    "market_probability": 0.183,
+    "signals": {
+      "whale_flow": 0.0,
+      "concentration": 0.0,
+      "momentum_24h": 0.0,
+      "momentum_6h": 0.0,
+      "volume_surge": 1.0,
+      "n_trades": 0,
+      "has_data": false
+    },
+    "adjusted_probability": 0.183,
+    "adjustment_explanation": "insufficient trade data"
+  },
+  {
+    "id": "1462839",
+    "platform": "polymarket",
+    "question": "Will Elon Musk post 360-379 tweets from March 3 to March 10, 2026?",
+    "volume": 318501.9974359997,
+    "market_probability": 0.077,
+    "signals": {
+      "whale_flow": 0.0,
+      "concentration": 0.0,
+      "momentum_24h": 0.0,
+      "momentum_6h": 0.0,
+      "volume_surge": 1.0,
+      "n_trades": 0,
+      "has_data": false
+    },
+    "adjusted_probability": 0.077,
+    "adjustment_explanation": "insufficient trade data"
+  },
+  {
+    "id": "1492987",
+    "platform": "polymarket",
+    "question": "Will the price of Bitcoin be between $60,000 and $62,000 on March 10?",
+    "volume": 294306.98546899995,
+    "market_probability": 0.074,
+    "signals": {
+      "whale_flow": 0.0,
+      "concentration": 0.0,
+      "momentum_24h": 0.0,
+      "momentum_6h": 0.0,
+      "volume_surge": 1.0,
+      "n_trades": 0,
+      "has_data": false
+    },
+    "adjusted_probability": 0.074,
+    "adjustment_explanation": "insufficient trade data"
+  },
+  {
+    "id": "1456052",
+    "platform": "polymarket",
+    "question": "Will FC Bayern M\u00fcnchen win on 2026-03-10?",
+    "volume": 280580.5299920003,
+    "market_probability": 0.605,
+    "signals": {
+      "whale_flow": 0.0,
+      "concentration": 0.0,
+      "momentum_24h": 0.0,
+      "momentum_6h": 0.0,
+      "volume_surge": 1.0,
+      "n_trades": 0,
+      "has_data": false
+    },
+    "adjusted_probability": 0.605,
+    "adjustment_explanation": "insufficient trade data"
+  },
+  {
+    "id": "KXUCLGAME-26MAR10ATABMU-BMU",
+    "platform": "kalshi",
+    "question": "Atalanta vs Bayern Munich Winner?",
+    "volume": 235309.0,
+    "market_probability": 0.615,
+    "signals": {
+      "whale_flow": 0.8731372262258376,
+      "concentration": 0.1332490525535658,
+      "momentum_24h": -0.004733504608107064,
+      "momentum_6h": -0.003014950166112973,
+      "volume_surge": 16.391999839976933,
+      "n_trades": 1000,
+      "has_data": true
+    },
+    "adjusted_probability": 0.615,
+    "adjustment_explanation": "mixed signals (whale/momentum disagree)"
+  },
+  {
+    "id": "KXUCLGAME-26MAR10GALLFC-LFC",
+    "platform": "kalshi",
+    "question": "Galatasaray vs Liverpool Winner?",
+    "volume": 227088.0,
+    "market_probability": 0.555,
+    "signals": {
+      "whale_flow": 0.8205239305329477,
+      "concentration": 0.020059505239168395,
+      "momentum_24h": 0.0028506787330316863,
+      "momentum_6h": 0.011445348967474511,
+      "volume_surge": 13.15433791540336,
+      "n_trades": 1000,
+      "has_data": true
+    },
+    "adjusted_probability": 0.5604072290948251,
+    "adjustment_explanation": "trade signal adjustment: whale=+0.82, momentum=+0.003, adj=+0.005"
+  },
+  {
+    "id": "1456044",
+    "platform": "polymarket",
+    "question": "Will Club Atl\u00e9tico de Madrid win on 2026-03-10?",
+    "volume": 193613.61855300018,
+    "market_probability": 0.635,
+    "signals": {
+      "whale_flow": 0.0,
+      "concentration": 0.0,
+      "momentum_24h": 0.0,
+      "momentum_6h": 0.0,
+      "volume_surge": 1.0,
+      "n_trades": 0,
+      "has_data": false
+    },
+    "adjusted_probability": 0.635,
+    "adjustment_explanation": "insufficient trade data"
+  },
+  {
+    "id": "1493017",
+    "platform": "polymarket",
+    "question": "Will the price of Ethereum be between $1,700 and $1,800 on March 10?",
+    "volume": 175160.25279499998,
+    "market_probability": 0.0935,
+    "signals": {
+      "whale_flow": 0.0,
+      "concentration": 0.0,
+      "momentum_24h": 0.0,
+      "momentum_6h": 0.0,
+      "volume_surge": 1.0,
+      "n_trades": 0,
+      "has_data": false
+    },
+    "adjusted_probability": 0.0935,
+    "adjustment_explanation": "insufficient trade data"
+  },
+  {
+    "id": "1299162",
+    "platform": "polymarket",
+    "question": "Will global temperature increase by more than 1.24\u00baC in February 2026?",
+    "volume": 172190.3241399998,
+    "market_probability": 0.1445,
+    "signals": {
+      "whale_flow": 0.0,
+      "concentration": 0.0,
+      "momentum_24h": 0.0,
+      "momentum_6h": 0.0,
+      "volume_surge": 1.0,
+      "n_trades": 0,
+      "has_data": false
+    },
+    "adjusted_probability": 0.1445,
+    "adjustment_explanation": "insufficient trade data"
+  },
+  {
+    "id": "1456035",
+    "platform": "polymarket",
+    "question": "Will Liverpool FC win on 2026-03-10?",
+    "volume": 156087.664941,
+    "market_probability": 0.545,
+    "signals": {
+      "whale_flow": 0.0,
+      "concentration": 0.0,
+      "momentum_24h": 0.0,
+      "momentum_6h": 0.0,
+      "volume_surge": 1.0,
+      "n_trades": 0,
+      "has_data": false
+    },
+    "adjusted_probability": 0.545,
+    "adjustment_explanation": "insufficient trade data"
+  },
+  {
+    "id": "1299161",
+    "platform": "polymarket",
+    "question": "Will global temperature increase by between 1.20\u00baC and 1.24\u00baC in February 2026?",
+    "volume": 139531.5546280001,
+    "market_probability": 0.665,
+    "signals": {
+      "whale_flow": 0.0,
+      "concentration": 0.0,
+      "momentum_24h": 0.0,
+      "momentum_6h": 0.0,
+      "volume_surge": 1.0,
+      "n_trades": 0,
+      "has_data": false
+    },
+    "adjusted_probability": 0.665,
+    "adjustment_explanation": "insufficient trade data"
+  },
+  {
+    "id": "KXUCLGAME-26MAR10ATMTOT-ATM",
+    "platform": "kalshi",
+    "question": "Atletico vs Tottenham Winner?",
+    "volume": 135666.0,
+    "market_probability": 0.64,
+    "signals": {
+      "whale_flow": 0.915759021206616,
+      "concentration": 0.03430920867167614,
+      "momentum_24h": 0.024349059888579383,
+      "momentum_6h": 0.018949784017278648,
+      "volume_surge": 10.085685246915482,
+      "n_trades": 519,
+      "has_data": true
+    },
+    "adjusted_probability": 0.6566950109504557,
+    "adjustment_explanation": "trade signal adjustment: whale=+0.92, momentum=+0.024, adj=+0.017"
+  },
+  {
+    "id": "1299159",
+    "platform": "polymarket",
+    "question": "Will global temperature increase by between 1.10\u00baC and 1.14\u00baC in February 2026?",
+    "volume": 125196.45022300024,
+    "market_probability": 0.062,
+    "signals": {
+      "whale_flow": 0.0,
+      "concentration": 0.0,
+      "momentum_24h": 0.0,
+      "momentum_6h": 0.0,
+      "volume_surge": 1.0,
+      "n_trades": 0,
+      "has_data": false
+    },
+    "adjusted_probability": 0.062,
+    "adjustment_explanation": "insufficient trade data"
+  },
+  {
+    "id": "1299160",
+    "platform": "polymarket",
+    "question": "Will global temperature increase by between 1.15\u00baC and 1.19\u00baC in February 2026?",
+    "volume": 124780.53085199997,
+    "market_probability": 0.11,
+    "signals": {
+      "whale_flow": 0.0,
+      "concentration": 0.0,
+      "momentum_24h": 0.0,
+      "momentum_6h": 0.0,
+      "volume_surge": 1.0,
+      "n_trades": 0,
+      "has_data": false
+    },
+    "adjusted_probability": 0.11,
+    "adjustment_explanation": "insufficient trade data"
+  },
+  {
+    "id": "KXTXSENATEGOPTURNOUT-26MAR03-22",
+    "platform": "kalshi",
+    "question": "Will the total vote count in the first round of the 2026 Texas Senate Republican primary be above 2200000?",
+    "volume": 116728.0,
+    "market_probability": 0.125,
+    "signals": {
+      "whale_flow": 0.3266878115088355,
+      "concentration": 0.011008227528242818,
+      "momentum_24h": -0.20361702127659576,
+      "momentum_6h": -0.1983256989417154,
+      "volume_surge": 0.28023618491008156,
+      "n_trades": 1000,
+      "has_data": true
+    },
+    "adjusted_probability": 0.125,
+    "adjustment_explanation": "mixed signals (whale/momentum disagree)"
+  }
+]

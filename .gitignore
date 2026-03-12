@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+.venv/
+
+# Environment variables
+.env
+
+# Data files (large / regenerable)
+data/raw/
+data/processed/*.parquet
+data/predictions/
+
+# Results (regenerable)
+results/*.png
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code local settings
+.claude/
+
+# Logs
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Poetry
+poetry.lock
